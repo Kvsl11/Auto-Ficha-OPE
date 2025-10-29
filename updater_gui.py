@@ -5,7 +5,7 @@ from tkinter import ttk, messagebox
 import subprocess
 
 # Configurações do repositório
-GITHUB_USER = "SEU_USUARIO_GITHUB"  # <-- substitua pelo seu nome de usuário
+GITHUB_USER = "Kvsl11"  # <-- substitua pelo seu nome de usuário
 REPO_NAME = "Auto-Ficha-OPE"
 
 # URLs base
