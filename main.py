@@ -901,22 +901,6 @@ def criar_interface():
 
     botao_cancelar = ctk.CTkButton(button_frame, text="Pausar", command=pausar_execucao, height=40, fg_color=PALETTE_ERROR_RED, text_color="#FFFFFF", hover_color=PALETTE_HOVER_RED, state="disabled", font=ctk.CTkFont(weight="bold"))
     botao_cancelar.pack(side="left", fill="x", expand=True, padx=(5, 0))
-
-    def checar_atualizacao():
-        """Executa a verificação de atualização manualmente."""
-        threading.Thread(target=verificar_atualizacao_disponivel, daemon=True).start()
-
-    botao_atualizar = ctk.CTkButton(
-        button_frame,
-        text="Verificar Atualização",
-        command=checar_atualizacao,
-        height=40,
-        fg_color="#0066cc",
-        text_color="#FFFFFF",
-        hover_color="#004d99",
-        font=ctk.CTkFont(weight="bold")
-    )
-    botao_atualizar.pack(side="left", fill="x", expand=True, padx=(5, 0))
     
 
     log_frame = ctk.CTkFrame(main_frame, fg_color="#F0F0F0", corner_radius=10)
