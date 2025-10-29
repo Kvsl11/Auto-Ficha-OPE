@@ -11,7 +11,7 @@ REPO_NAME = "Auto-Ficha-OPE"
 # URLs base
 BASE_URL = f"https://raw.githubusercontent.com/{GITHUB_USER}/{REPO_NAME}/main/"
 VERSION_FILE = "version.txt"
-SCRIPT_FILE = "Version_4.2.3.py"
+SCRIPT_FILE = "main.py"
 
 # Caminho local
 LOCAL_SCRIPT = os.path.join(os.getcwd(), SCRIPT_FILE)
