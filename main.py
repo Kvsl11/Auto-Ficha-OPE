@@ -106,7 +106,7 @@ testar_ssl()
 logger.info("✅ Configuração SSL concluída com segurança.")
 
 # --- VERIFICAÇÃO DE ATUALIZAÇÃO VIA GITHUB ---
-VERSAO = "4.2.3"
+VERSAO = "4.2.4"
 
 def verificar_atualizacao_disponivel(root=None, frame_status=None):
     """Verifica no GitHub se há nova versão e exibe status visual na interface."""
@@ -198,7 +198,7 @@ em_pausa = False
 driver = None
 tempo_inicio_ficha = None
 tempo_decorrido_inicio = None
-VERSAO = "4.2.3"  # Aumento da versão após revisão
+VERSAO = "4.2.4"  # Aumento da versão após revisão
 
 # Global UI elements
 root = None
