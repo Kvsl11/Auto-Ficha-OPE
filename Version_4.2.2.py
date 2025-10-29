@@ -22,6 +22,7 @@ import sys
 import requests
 import tkinter as tk
 from tkinter import messagebox
+import webbrowser
 
 # Caminho da pasta do app e Python interno
 app_dir = os.path.dirname(os.path.abspath(__file__))
@@ -107,55 +108,87 @@ logger.info("✅ Configuração SSL concluída com segurança.")
 # --- VERIFICAÇÃO DE ATUALIZAÇÃO VIA GITHUB ---
 VERSAO = "4.2.2"
 
-def verificar_atualizacao_disponivel(root=None):
-    """Verifica no GitHub se há nova versão e exibe alerta visual na interface."""
+def verificar_atualizacao_disponivel(root=None, frame_status=None):
+    """Verifica no GitHub se há nova versão e exibe status visual na interface."""
     try:
         repo_url = "https://raw.githubusercontent.com/Kvsl11/Auto-Ficha-OPE/main/version.txt"
+
+        if frame_status:
+            # Mostra status inicial de verificação
+            for widget in frame_status.winfo_children():
+                widget.destroy()
+            status_label = ctk.CTkLabel(frame_status, text="🔄 Verificando atualizações...", text_color="#ffffff")
+            status_label.pack(pady=2)
+
         resposta = requests.get(repo_url, timeout=8, verify=False)
+
         if resposta.status_code == 200:
             versao_online = resposta.text.strip()
+
+            # Limpa frame de status
+            if frame_status:
+                for widget in frame_status.winfo_children():
+                    widget.destroy()
+
             if versao_online != VERSAO:
-                msg = f"🟡 Nova atualização disponível: v{versao_online} (sua versão: v{VERSAO})"
+                # Nova versão disponível
+                msg = f"🟡 Nova versão disponível: v{versao_online} (sua versão: v{VERSAO})"
                 print(msg)
 
-                # Mostra caixa de diálogo (opcional)
-                try:
-                    messagebox.showinfo(
-                        "Atualização disponível",
-                        f"Uma nova versão ({versao_online}) está disponível!\n\n"
-                        "Clique no banner na interface ou acesse:\n"
-                        "https://github.com/Kvsl11/Auto-Ficha-OPE"
+                if frame_status:
+                    label = ctk.CTkLabel(
+                        frame_status,
+                        text=f"🟡 Nova versão disponível: v{versao_online}",
+                        text_color="#fff8dc",
+                        font=ctk.CTkFont(weight="bold")
                     )
-                except:
-                    pass
+                    label.pack(side="left", padx=10, pady=3)
 
-                # Se a interface estiver aberta, cria banner visual
-                if root:
-                    try:
-                        import webbrowser
+                    def abrir_repo():
+                        webbrowser.open("https://github.com/Kvsl11/Auto-Ficha-OPE")
 
-                        banner_frame = tk.Frame(root, bg="#fff3cd", height=40)
-                        banner_frame.pack(fill="x", pady=(0, 5))
+                    botao = ctk.CTkButton(
+                        frame_status,
+                        text="⬇ Atualizar agora",
+                        fg_color="#ffaa00",
+                        hover_color="#cc8800",
+                        text_color="#000000",
+                        width=150,
+                        command=abrir_repo
+                    )
+                    botao.pack(side="right", padx=10, pady=3)
 
-                        label_text = tk.Label(
-                            banner_frame,
-                            text=f"🟡 Nova versão disponível: v{versao_online} — clique aqui para atualizar",
-                            bg="#fff3cd", fg="#856404", font=("Segoe UI", 10, "bold"), cursor="hand2"
-                        )
-                        label_text.pack(pady=5)
-
-                        def abrir_repo(event=None):
-                            webbrowser.open("https://github.com/Kvsl11/Auto-Ficha-OPE")
-
-                        label_text.bind("<Button-1>", abrir_repo)
-                    except Exception as e:
-                        print(f"⚠️ Falha ao criar banner visual: {e}")
             else:
+                # Versão atualizada
                 print("🟢 Você está usando a versão mais recente.")
+                if frame_status:
+                    label = ctk.CTkLabel(
+                        frame_status,
+                        text=f"🟢 Aplicação atualizada — v{VERSAO}",
+                        text_color="#bffcc8",
+                        font=ctk.CTkFont(weight="bold")
+                    )
+                    label.pack(pady=3)
         else:
-            print(f"⚠️ Falha ao verificar atualizações (HTTP {resposta.status_code})")
+            if frame_status:
+                for widget in frame_status.winfo_children():
+                    widget.destroy()
+                ctk.CTkLabel(
+                    frame_status,
+                    text=f"⚠️ Falha ao verificar atualização (HTTP {resposta.status_code})",
+                    text_color="#ffcc00"
+                ).pack(pady=3)
+
     except Exception as e:
         print(f"⚠️ Falha ao verificar atualização: {e}")
+        if frame_status:
+            for widget in frame_status.winfo_children():
+                widget.destroy()
+            ctk.CTkLabel(
+                frame_status,
+                text="⚠️ Erro de conexão ao verificar atualização.",
+                text_color="#ffcc00"
+            ).pack(pady=3)
 
 # Variáveis globais
 executando = False
@@ -789,6 +822,17 @@ def criar_interface():
 
         # Verifica atualização automaticamente ao iniciar
     threading.Thread(target=lambda: verificar_atualizacao_disponivel(root), daemon=True).start()
+
+        # Cria o painel superior de status de atualização
+    frame_status = ctk.CTkFrame(root, height=30, fg_color="#1a1a1a")
+    frame_status.pack(fill="x")
+
+    # Inicia verificação automática em segundo plano
+    threading.Thread(
+        target=lambda: verificar_atualizacao_disponivel(root, frame_status),
+        daemon=True
+    ).start()
+
 
     main_frame = ctk.CTkFrame(root, fg_color=PALETTE_BG, corner_radius=10)
     main_frame.pack(pady=20, padx=20, fill="both", expand=True)
