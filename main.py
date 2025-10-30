@@ -12,7 +12,6 @@ import time
 import json
 from datetime import datetime
 import customtkinter as ctk
-# --- CORREÇÃO SSL HÍBRIDA + ATUALIZAÇÃO AUTOMÁTICA VIA GITHUB ---
 import os
 import ssl
 import subprocess
@@ -114,7 +113,7 @@ testar_ssl()
 logger.info("✅ Configuração SSL concluída com segurança.")
 
 # --- VERIFICAÇÃO DE ATUALIZAÇÃO VIA GITHUB ---
-VERSAO = "4.3.1"
+VERSAO = "4.3.2"
 
 def verificar_atualizacao_disponivel(root=None, frame_status=None):
     """Verifica no GitHub se há nova versão e atualiza automaticamente, se desejado."""
@@ -216,7 +215,7 @@ em_pausa = False
 driver = None
 tempo_inicio_ficha = None
 tempo_decorrido_inicio = None
-VERSAO = "4.3.1"  # Aumento da versão após revisão
+VERSAO = "4.3.2"  # Aumento da versão após revisão
 
 # Global UI elements
 root = None
