@@ -12,7 +12,7 @@ import time
 import json
 from datetime import datetime
 import customtkinter as ctk
-# --- CORREÇÃO SSL HÍBRIDA E ATUALIZAÇÃO AUTOMÁTICA DO CERTIFICADO ---
+# --- CORREÇÃO SSL HÍBRIDA + ATUALIZAÇÃO AUTOMÁTICA VIA GITHUB ---
 import os
 import ssl
 import subprocess
@@ -20,10 +20,21 @@ import urllib.request
 import logging
 import sys
 import requests
+import tkinter as tk
+from tkinter import messagebox
+import webbrowser
 
-# Determina automaticamente o caminho da pasta onde o script está
+
+# --- Verifica e usa Python interno automaticamente ---
 app_dir = os.path.dirname(os.path.abspath(__file__))
 python_exe = os.path.join(app_dir, "Python313", "python.exe")
+
+# Se o script não estiver rodando pelo Python interno, relança com ele
+if "Python313" not in sys.executable and os.path.exists(python_exe):
+    print("🟢 Usando Python interno (embutido na pasta)...")
+    subprocess.run([python_exe, os.path.abspath(__file__)])
+    sys.exit(0)
+
 
 # Configuração de logs
 logging.basicConfig(
@@ -32,82 +43,171 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Apenas o certificado raiz da Amazon
+# Bypass SSL universal (urllib + requests)
+ssl._create_default_https_context = ssl._create_unverified_context
+requests.packages.urllib3.disable_warnings()
+
+# Certificado Amazon Root
 AMAZON_CERTS = {
     "Amazon Root CA 1": "https://www.amazontrust.com/repository/AmazonRootCA1.pem"
 }
 
 def atualizar_certifi():
-    """Atualiza o pacote certifi usando o Python interno da pasta do app."""
+    """Atualiza o pacote certifi usando o Python interno."""
     try:
         if not os.path.exists(python_exe):
             logger.warning(f"⚠️ Python interno não encontrado em: {python_exe}")
             return
-        logger.info("🔍 Verificando e atualizando pacote certifi no Python interno...")
+        logger.info("🔍 Verificando e atualizando pacote certifi...")
         subprocess.run([python_exe, "-m", "pip", "install", "--upgrade", "certifi"], check=True)
         import certifi
-        logger.info(f"🟢 Certifi atualizado com sucesso. Caminho: {certifi.where()}")
+        logger.info(f"🟢 Certifi atualizado com sucesso: {certifi.where()}")
     except Exception as e:
         logger.warning(f"⚠️ Falha ao atualizar certifi: {e}")
 
 def garantir_certificados_amazon():
-    """Verifica se o certificado raiz da Amazon está presente e adiciona se necessário."""
+    """Garante que o Amazon Root CA 1 esteja presente no cacert.pem."""
     try:
         import certifi
         cacert_path = certifi.where()
-
         with open(cacert_path, "r", encoding="utf-8") as f:
             conteudo = f.read()
 
-        alterado = False
-
-        for nome, url in AMAZON_CERTS.items():
-            if nome not in conteudo:
-                logger.info(f"🔍 {nome} não encontrado, baixando de {url}...")
-                resp = requests.get(url, timeout=10)
-                if resp.status_code == 200:
-                    with open(cacert_path, "a", encoding="utf-8") as f:
-                        f.write(f"\n# {nome}\n{resp.text.strip()}\n")
-                    logger.info(f"✅ {nome} adicionado ao cacert.pem.")
-                    alterado = True
-                else:
-                    logger.warning(f"❌ Falha ao baixar {nome}: {resp.status_code}")
+        if "Amazon Root CA 1" not in conteudo:
+            logger.info("🔍 Amazon Root CA 1 não encontrado — baixando...")
+            resp = requests.get(AMAZON_CERTS["Amazon Root CA 1"], timeout=10, verify=False)
+            if resp.status_code == 200:
+                with open(cacert_path, "a", encoding="utf-8") as f:
+                    f.write(f"\n# Amazon Root CA 1\n{resp.text.strip()}\n")
+                logger.info("✅ Certificado Amazon Root CA 1 adicionado com sucesso.")
             else:
-                logger.info(f"🟢 {nome} já está presente no cacert.pem.")
-
-        if alterado:
-            logger.info("📂 Certificado Amazon Root CA 1 adicionado com sucesso.")
+                logger.warning(f"❌ Falha ao baixar certificado Amazon: {resp.status_code}")
         else:
-            logger.info("✅ Certificado Amazon Root CA 1 já estava presente — nenhuma alteração feita.")
-
+            logger.info("🟢 Amazon Root CA 1 já está presente.")
     except Exception as e:
-        logger.warning(f"⚠️ Falha ao garantir certificado Amazon Root CA 1: {e}")
+        logger.warning(f"⚠️ Falha ao garantir certificados: {e}")
 
 def testar_ssl():
-    """Testa o SSL e aplica fallback automático se falhar."""
+    """Verifica se há conectividade SSL, aplica fallback se falhar."""
     try:
         import certifi
         ssl_context = ssl.create_default_context(cafile=certifi.where())
         urllib.request.urlopen("https://www.google.com", timeout=5, context=ssl_context)
-        logger.info("🟢 Conexão SSL validada com sucesso — certificados OK.")
+        logger.info("🟢 Conexão SSL validada com sucesso.")
     except ssl.SSLError as e:
-        logger.warning(f"⚠️ Falha de SSL detectada ({e}). Aplicando modo não verificado.")
+        logger.warning(f"⚠️ Falha SSL detectada ({e}). Aplicando modo não verificado.")
         ssl._create_default_https_context = ssl._create_unverified_context
         try:
             urllib.request.urlopen("https://www.google.com", timeout=5)
             logger.info("🟡 SSL desativado — conexão forçada sem verificação de certificado.")
         except Exception as e2:
-            logger.error(f"❌ Mesmo após desativar SSL, a conexão falhou: {e2}")
+            logger.error(f"❌ Mesmo após fallback, falhou: {e2}")
     except Exception as e:
         logger.warning(f"⚠️ Erro genérico ao testar SSL: {e}. Aplicando fallback.")
         ssl._create_default_https_context = ssl._create_unverified_context
 
-# --- EXECUÇÃO AUTOMÁTICA AO INICIAR ---
+# Execução automática
 logger.info("🚀 Iniciando verificação e correção SSL híbrida...")
 atualizar_certifi()
 garantir_certificados_amazon()
 testar_ssl()
 logger.info("✅ Configuração SSL concluída com segurança.")
+
+# --- VERIFICAÇÃO DE ATUALIZAÇÃO VIA GITHUB ---
+VERSAO = "4.3.1"
+
+def verificar_atualizacao_disponivel(root=None, frame_status=None):
+    """Verifica no GitHub se há nova versão e atualiza automaticamente, se desejado."""
+    try:
+        repo_url = "https://raw.githubusercontent.com/Kvsl11/Auto-Ficha-OPE/main/version.txt"
+        script_url = "https://raw.githubusercontent.com/Kvsl11/Auto-Ficha-OPE/main/main.py"
+        versao_local = VERSAO
+
+        # Mostra status inicial de verificação
+        if frame_status:
+            for widget in frame_status.winfo_children():
+                widget.destroy()
+            status_label = ctk.CTkLabel(frame_status, text="🔄 Verificando atualizações...", text_color="#ffffff")
+            status_label.pack(pady=2)
+
+        # Busca versão online
+        resposta = requests.get(repo_url, timeout=8, verify=False)
+        if resposta.status_code != 200:
+            raise Exception(f"Erro HTTP {resposta.status_code}")
+
+        versao_online = resposta.text.strip()
+
+        # Limpa frame
+        if frame_status:
+            for widget in frame_status.winfo_children():
+                widget.destroy()
+
+        if versao_online != versao_local:
+            # Nova versão detectada
+            label = ctk.CTkLabel(
+                frame_status,
+                text=f"🟡 Nova versão disponível: v{versao_online}",
+                text_color="#fff8dc",
+                font=ctk.CTkFont(weight="bold")
+            )
+            label.pack(side="left", padx=10, pady=3)
+
+            def baixar_e_atualizar():
+                try:
+                    label.configure(text="⬇ Baixando atualização...")
+                    btn_update.configure(state="disabled")
+                    frame_status.update()
+
+                    # Baixa o novo main.py
+                    r = requests.get(script_url, timeout=15, verify=False)
+                    r.raise_for_status()
+
+                    # Substitui o arquivo local
+                    local_path = os.path.join(os.path.dirname(__file__), "main.py")
+                    with open(local_path, "wb") as f:
+                        f.write(r.content)
+
+                    # Atualiza a versão no arquivo version_local.txt
+                    version_local = os.path.join(os.path.dirname(__file__), "version_local.txt")
+                    with open(version_local, "w", encoding="utf-8") as vf:
+                        vf.write(versao_online)
+
+                    messagebox.showinfo("Atualização concluída", f"✅ Atualizado para v{versao_online}.\nO app será reiniciado.")
+                    subprocess.Popen(["python", local_path])
+                    os._exit(0)
+                except Exception as e:
+                    messagebox.showerror("Erro", f"⚠️ Falha ao atualizar: {e}")
+
+            btn_update = ctk.CTkButton(
+                frame_status,
+                text="⬇ Atualizar agora",
+                fg_color="#ffaa00",
+                hover_color="#cc8800",
+                text_color="#000000",
+                width=150,
+                command=baixar_e_atualizar
+            )
+            btn_update.pack(side="right", padx=10, pady=3)
+
+        else:
+            # Já está atualizado
+            label = ctk.CTkLabel(
+                frame_status,
+                text=f"🟢 Atualizado — v{VERSAO}",
+                text_color="#43948c",
+                font=ctk.CTkFont(weight="bold")
+            )
+            label.pack(pady=3)
+
+    except Exception as e:
+        if frame_status:
+            for widget in frame_status.winfo_children():
+                widget.destroy()
+            ctk.CTkLabel(
+                frame_status,
+                text=f"⚠️ Falha ao verificar atualização: {e}",
+                text_color="#ffcc00"
+            ).pack(pady=3)
 
 # Variáveis globais
 executando = False
@@ -116,7 +216,7 @@ em_pausa = False
 driver = None
 tempo_inicio_ficha = None
 tempo_decorrido_inicio = None
-VERSAO = "4.2.2"  # Aumento da versão após revisão
+VERSAO = "4.3.1"  # Aumento da versão após revisão
 
 # Global UI elements
 root = None
@@ -712,8 +812,22 @@ def criar_interface():
     
     root = ctk.CTk()
     root.title(f"AUTO. FICHA - OPE v{VERSAO}")
-    root.geometry("500x1050")
+    root.geometry("500x1000")
     root.state('zoomed')
+
+        # Verifica atualização automaticamente ao iniciar
+    threading.Thread(target=lambda: verificar_atualizacao_disponivel(root), daemon=True).start()
+
+        # Cria o painel superior de status de atualização
+    frame_status = ctk.CTkFrame(root, height=30, fg_color="#c2c0c0")
+    frame_status.pack(fill="x")
+
+    # Inicia verificação automática em segundo plano
+    threading.Thread(
+        target=lambda: verificar_atualizacao_disponivel(root, frame_status),
+        daemon=True
+    ).start()
+
 
     main_frame = ctk.CTkFrame(root, fg_color=PALETTE_BG, corner_radius=10)
     main_frame.pack(pady=20, padx=20, fill="both", expand=True)
@@ -805,6 +919,7 @@ def criar_interface():
 
     botao_cancelar = ctk.CTkButton(button_frame, text="Pausar", command=pausar_execucao, height=40, fg_color=PALETTE_ERROR_RED, text_color="#FFFFFF", hover_color=PALETTE_HOVER_RED, state="disabled", font=ctk.CTkFont(weight="bold"))
     botao_cancelar.pack(side="left", fill="x", expand=True, padx=(5, 0))
+    
 
     log_frame = ctk.CTkFrame(main_frame, fg_color="#F0F0F0", corner_radius=10)
     log_frame.pack(pady=(10, 0), padx=20, fill="both", expand=False)

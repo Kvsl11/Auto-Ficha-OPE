@@ -1,6 +1,6 @@
 import requests, os, subprocess
 
-GITHUB_USER = "SEU_USUARIO_GITHUB"  # <-- substitua
+GITHUB_USER = "Kvsl11"  # <-- substitua
 REPO_NAME = "Auto-Ficha-OPE"
 
 BASE_URL = f"https://raw.githubusercontent.com/{GITHUB_USER}/{REPO_NAME}/main/"
