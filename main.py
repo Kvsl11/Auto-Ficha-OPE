@@ -24,9 +24,17 @@ import tkinter as tk
 from tkinter import messagebox
 import webbrowser
 
-# Caminho da pasta do app e Python interno
+
+# --- Verifica e usa Python interno automaticamente ---
 app_dir = os.path.dirname(os.path.abspath(__file__))
 python_exe = os.path.join(app_dir, "Python313", "python.exe")
+
+# Se o script não estiver rodando pelo Python interno, relança com ele
+if "Python313" not in sys.executable and os.path.exists(python_exe):
+    print("🟢 Usando Python interno (embutido na pasta)...")
+    subprocess.run([python_exe, os.path.abspath(__file__)])
+    sys.exit(0)
+
 
 # Configuração de logs
 logging.basicConfig(
@@ -106,87 +114,98 @@ testar_ssl()
 logger.info("✅ Configuração SSL concluída com segurança.")
 
 # --- VERIFICAÇÃO DE ATUALIZAÇÃO VIA GITHUB ---
-VERSAO = "4.2.5"
+VERSAO = "4.3.0"
 
 def verificar_atualizacao_disponivel(root=None, frame_status=None):
-    """Verifica no GitHub se há nova versão e exibe status visual na interface."""
+    """Verifica no GitHub se há nova versão e atualiza automaticamente, se desejado."""
     try:
         repo_url = "https://raw.githubusercontent.com/Kvsl11/Auto-Ficha-OPE/main/version.txt"
+        script_url = "https://raw.githubusercontent.com/Kvsl11/Auto-Ficha-OPE/main/main.py"
+        versao_local = VERSAO
 
+        # Mostra status inicial de verificação
         if frame_status:
-            # Mostra status inicial de verificação
             for widget in frame_status.winfo_children():
                 widget.destroy()
             status_label = ctk.CTkLabel(frame_status, text="🔄 Verificando atualizações...", text_color="#ffffff")
             status_label.pack(pady=2)
 
+        # Busca versão online
         resposta = requests.get(repo_url, timeout=8, verify=False)
+        if resposta.status_code != 200:
+            raise Exception(f"Erro HTTP {resposta.status_code}")
 
-        if resposta.status_code == 200:
-            versao_online = resposta.text.strip()
+        versao_online = resposta.text.strip()
 
-            # Limpa frame de status
-            if frame_status:
-                for widget in frame_status.winfo_children():
-                    widget.destroy()
+        # Limpa frame
+        if frame_status:
+            for widget in frame_status.winfo_children():
+                widget.destroy()
 
-            if versao_online != VERSAO:
-                # Nova versão disponível
-                msg = f"🟡 Nova versão disponível: v{versao_online} (sua versão: v{VERSAO})"
-                print(msg)
+        if versao_online != versao_local:
+            # Nova versão detectada
+            label = ctk.CTkLabel(
+                frame_status,
+                text=f"🟡 Nova versão disponível: v{versao_online}",
+                text_color="#fff8dc",
+                font=ctk.CTkFont(weight="bold")
+            )
+            label.pack(side="left", padx=10, pady=3)
 
-                if frame_status:
-                    label = ctk.CTkLabel(
-                        frame_status,
-                        text=f"🟡 Nova versão disponível: v{versao_online}",
-                        text_color="#fff8dc",
-                        font=ctk.CTkFont(weight="bold")
-                    )
-                    label.pack(side="left", padx=10, pady=3)
+            def baixar_e_atualizar():
+                try:
+                    label.configure(text="⬇ Baixando atualização...")
+                    btn_update.configure(state="disabled")
+                    frame_status.update()
 
-                    def abrir_repo():
-                        webbrowser.open("https://github.com/Kvsl11/Auto-Ficha-OPE")
+                    # Baixa o novo main.py
+                    r = requests.get(script_url, timeout=15, verify=False)
+                    r.raise_for_status()
 
-                    botao = ctk.CTkButton(
-                        frame_status,
-                        text="⬇ Atualizar agora",
-                        fg_color="#ffaa00",
-                        hover_color="#cc8800",
-                        text_color="#000000",
-                        width=150,
-                        command=abrir_repo
-                    )
-                    botao.pack(side="right", padx=10, pady=3)
+                    # Substitui o arquivo local
+                    local_path = os.path.join(os.path.dirname(__file__), "main.py")
+                    with open(local_path, "wb") as f:
+                        f.write(r.content)
 
-            else:
-                # Versão atualizada
-                print("🟢 Você está usando a versão mais recente.")
-                if frame_status:
-                    label = ctk.CTkLabel(
-                        frame_status,
-                        text=f"🟢 Aplicação atualizada — v{VERSAO}",
-                        text_color="#bffcc8",
-                        font=ctk.CTkFont(weight="bold")
-                    )
-                    label.pack(pady=3)
+                    # Atualiza a versão no arquivo version_local.txt
+                    version_local = os.path.join(os.path.dirname(__file__), "version_local.txt")
+                    with open(version_local, "w", encoding="utf-8") as vf:
+                        vf.write(versao_online)
+
+                    messagebox.showinfo("Atualização concluída", f"✅ Atualizado para v{versao_online}.\nO app será reiniciado.")
+                    subprocess.Popen(["python", local_path])
+                    os._exit(0)
+                except Exception as e:
+                    messagebox.showerror("Erro", f"⚠️ Falha ao atualizar: {e}")
+
+            btn_update = ctk.CTkButton(
+                frame_status,
+                text="⬇ Atualizar agora",
+                fg_color="#ffaa00",
+                hover_color="#cc8800",
+                text_color="#000000",
+                width=150,
+                command=baixar_e_atualizar
+            )
+            btn_update.pack(side="right", padx=10, pady=3)
+
         else:
-            if frame_status:
-                for widget in frame_status.winfo_children():
-                    widget.destroy()
-                ctk.CTkLabel(
-                    frame_status,
-                    text=f"⚠️ Falha ao verificar atualização (HTTP {resposta.status_code})",
-                    text_color="#ffcc00"
-                ).pack(pady=3)
+            # Já está atualizado
+            label = ctk.CTkLabel(
+                frame_status,
+                text=f"🟢 Aplicação atualizada — v{VERSAO}",
+                text_color="#bffcc8",
+                font=ctk.CTkFont(weight="bold")
+            )
+            label.pack(pady=3)
 
     except Exception as e:
-        print(f"⚠️ Falha ao verificar atualização: {e}")
         if frame_status:
             for widget in frame_status.winfo_children():
                 widget.destroy()
             ctk.CTkLabel(
                 frame_status,
-                text="⚠️ Erro de conexão ao verificar atualização.",
+                text=f"⚠️ Falha ao verificar atualização: {e}",
                 text_color="#ffcc00"
             ).pack(pady=3)
 
@@ -198,7 +217,7 @@ em_pausa = False
 driver = None
 tempo_inicio_ficha = None
 tempo_decorrido_inicio = None
-VERSAO = "4.2.5"  # Aumento da versão após revisão
+VERSAO = "4.3.0"  # Aumento da versão após revisão
 
 # Global UI elements
 root = None
@@ -794,7 +813,7 @@ def criar_interface():
     
     root = ctk.CTk()
     root.title(f"AUTO. FICHA - OPE v{VERSAO}")
-    root.geometry("800x1050")
+    root.geometry("500x1000")
     root.state('zoomed')
 
         # Verifica atualização automaticamente ao iniciar
