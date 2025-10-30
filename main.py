@@ -114,7 +114,7 @@ testar_ssl()
 logger.info("✅ Configuração SSL concluída com segurança.")
 
 # --- VERIFICAÇÃO DE ATUALIZAÇÃO VIA GITHUB ---
-VERSAO = "4.3.0"
+VERSAO = "4.3.1"
 
 def verificar_atualizacao_disponivel(root=None, frame_status=None):
     """Verifica no GitHub se há nova versão e atualiza automaticamente, se desejado."""
@@ -193,8 +193,8 @@ def verificar_atualizacao_disponivel(root=None, frame_status=None):
             # Já está atualizado
             label = ctk.CTkLabel(
                 frame_status,
-                text=f"🟢 Aplicação atualizada — v{VERSAO}",
-                text_color="#bffcc8",
+                text=f"🟢 Atualizado — v{VERSAO}",
+                text_color="#43948c",
                 font=ctk.CTkFont(weight="bold")
             )
             label.pack(pady=3)
@@ -209,7 +209,6 @@ def verificar_atualizacao_disponivel(root=None, frame_status=None):
                 text_color="#ffcc00"
             ).pack(pady=3)
 
-
 # Variáveis globais
 executando = False
 continuar_execucao = False
@@ -217,7 +216,7 @@ em_pausa = False
 driver = None
 tempo_inicio_ficha = None
 tempo_decorrido_inicio = None
-VERSAO = "4.3.0"  # Aumento da versão após revisão
+VERSAO = "4.3.1"  # Aumento da versão após revisão
 
 # Global UI elements
 root = None
@@ -820,7 +819,7 @@ def criar_interface():
     threading.Thread(target=lambda: verificar_atualizacao_disponivel(root), daemon=True).start()
 
         # Cria o painel superior de status de atualização
-    frame_status = ctk.CTkFrame(root, height=30, fg_color="#1a1a1a")
+    frame_status = ctk.CTkFrame(root, height=30, fg_color="#c2c0c0")
     frame_status.pack(fill="x")
 
     # Inicia verificação automática em segundo plano
