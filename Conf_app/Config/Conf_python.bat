@@ -14,7 +14,7 @@ set "BASE_DIR=%~dp0"
 REM === Caminhos principais ===
 set "MAIN_FILE=%BASE_DIR%..\app_py\main.py"
 set "REQ_FILE=%BASE_DIR%..\app_py\requirements.txt"
-set "PYTHON_PATH=%BASE_DIR%..\app_py\Python313\Python313\python.exe"
+set "PYTHON_PATH=%BASE_DIR%..\app_py\Python313\python.exe"
 set "LOG_FILE=%BASE_DIR%pip_repair_log.txt"
 set "SSL_URL=https://github.com/python/cpython/raw/main/PCbuild/amd64"
 
@@ -70,6 +70,11 @@ for /f "usebackq delims=" %%M in ("%REQ_FILE%") do (
 move /y "%TMP_FILE%" "%REQ_FILE%" >nul
 echo setuptools>>"%REQ_FILE%"
 echo wheel>>"%REQ_FILE%"
+
+REM === Dependências obrigatórias extras (sempre adicionadas) ===
+for %%P in (openpyxl) do (
+    findstr /ix "%%P" "%REQ_FILE%" >nul || echo %%P>>"%REQ_FILE%"
+)
 
 echo [OK] requirements.txt gerado com sucesso.
 echo Local: %REQ_FILE%
