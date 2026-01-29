@@ -113,7 +113,7 @@ testar_ssl()
 logger.info("✅ Configuração SSL concluída com segurança.")
 
 # --- VERIFICAÇÃO DE ATUALIZAÇÃO VIA GITHUB ---
-VERSAO = "4.3.5"
+VERSAO = "4.3.6"
 
 def verificar_e_atualizar_automaticamente():
     """
@@ -247,7 +247,8 @@ def iniciar_driver(headless=False, user_data_dir=None):
         chrome_options.add_argument(f"user-data-dir={user_data_dir}")
 
     log_mensagem("🔵 Iniciando o driver em modo Gráfico com otimizações de robustez.")
-    return uc.Chrome(options=chrome_options, use_subprocess=True)
+   # Isso força o driver a buscar a versão compatível com seu Chrome 144
+    return uc.Chrome(options=chrome_options, use_subprocess=True, version_main=144)
 
 def aguardar_pagina_carregada(driver, timeout=30):
     """Espera até que o status de carregamento da página seja 'complete'."""
