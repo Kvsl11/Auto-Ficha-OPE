@@ -109,7 +109,7 @@ testar_ssl()
 logger.info("✅ Configuração SSL concluída com segurança.")
 
 # --- VERIFICAÇÃO DE SEGURANÇA E ATUALIZAÇÃO VIA GITHUB ---
-VERSAO = "4.3.7"
+VERSAO = "4.3.8"
 
 def verificar_seguranca_e_atualizacao():
     """
