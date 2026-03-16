@@ -108,108 +108,46 @@ garantir_certificados_amazon()
 testar_ssl()
 logger.info("✅ Configuração SSL concluída com segurança.")
 
-# --- VERIFICAÇÃO DE SEGURANÇA E ATUALIZAÇÃO VIA GITHUB ---
-VERSAO = "4.3.8"
+# --- VERIFICAÇÃO DE SEGURANÇA VIA GITHUB ---
+VERSAO = "4.3.9"
 
-def verificar_seguranca_e_atualizacao():
+def exibir_erro_fatal(titulo, mensagem):
+    """Exibe uma janela de erro travada na tela e fecha o programa."""
+    root_temp = tk.Tk()
+    root_temp.withdraw()
+    root_temp.attributes("-topmost", True) # Garante que a mensagem apareça em cima de tudo
+    messagebox.showerror(titulo, mensagem)
+    root_temp.destroy()
+    os._exit(1)
+
+def verificar_seguranca():
     """
-    Verifica a trava de segurança (status.txt) e se há nova versão (version.txt).
-    Bloqueia o app caso esteja desativado ou caso uma atualização falhe.
+    Verifica a trava de segurança (status.txt).
+    Bloqueia o app caso esteja desativado remotamente.
     """
     try:
         REPO = "Kvsl11/Hxg_auto"
-        URL_STATUS = f"https://raw.githubusercontent.com/{REPO}/main/status.txt"
-        URL_VERSION = f"https://raw.githubusercontent.com/{REPO}/main/version.txt"
-        URL_SCRIPT = f"https://raw.githubusercontent.com/{REPO}/main/main.py"
-        LOCAL_SCRIPT = os.path.join(os.path.dirname(__file__), "main.py")
-        LOCAL_VERSION_FILE = os.path.join(os.path.dirname(__file__), "version_local.txt")
+        # BURLADOR DE CACHE: Adiciona o timestamp na URL para pegar sempre a última alteração na hora
+        ts = int(time.time()) 
+        URL_STATUS = f"https://raw.githubusercontent.com/{REPO}/main/status.txt?t={ts}"
         LOG_PATH = os.path.join(os.path.dirname(__file__), "autoupdate.log")
 
         logging.basicConfig(filename=LOG_PATH, level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
         # 1. VERIFICAR A TRAVA DE SEGURANÇA (KILL SWITCH)
         try:
-            headers = {"Cache-Control": "no-cache", "Pragma": "no-cache"}
+            headers = {"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache"}
             r_status = requests.get(URL_STATUS, timeout=10, verify=False, headers=headers)
             if r_status.status_code == 200:
                 status_app = r_status.text.strip().lower()
                 if status_app == "false":
-                    # Trava ativada! Mostrar erro e fechar o app imediatamente.
-                    root_temp = tk.Tk()
-                    root_temp.withdraw()
-                    messagebox.showerror("Acesso Bloqueado", "Este aplicativo foi desativado remotamente.\nEntre em contato com o administrador.")
-                    os._exit(1)
+                    logging.warning("🔴 TRAVA ATIVADA VIA GITHUB! Bloqueando acesso.")
+                    exibir_erro_fatal("Acesso Bloqueado", "Este aplicativo foi desativado remotamente.\nEntre em contacto com o administrador.")
         except Exception as e:
-            logging.warning(f"⚠️ Falha ao checar status.txt (Internet/GitHub fora do ar). Ignorando trava.")
-
-        # 2. SISTEMA DE ATUALIZAÇÃO OBRIGATÓRIA
-        def get_local_version():
-            if os.path.exists(LOCAL_VERSION_FILE):
-                try:
-                    with open(LOCAL_VERSION_FILE, "r", encoding="utf-8") as f:
-                        return f.read().strip()
-                except Exception:
-                    return "0.0.0"
-            return "0.0.0"
-
-        def get_online_version():
-            try:
-                headers = {"Cache-Control": "no-cache", "Pragma": "no-cache"}
-                r = requests.get(URL_VERSION, timeout=10, verify=False, headers=headers)
-                if r.status_code == 200:
-                    return r.text.strip()
-            except Exception as e:
-                logging.warning(f"⚠️ Falha ao obter versão online: {e}")
-            return None
-
-        def atualizar_script(versao_online):
-            try:
-                headers = {"Cache-Control": "no-cache", "Pragma": "no-cache"}
-                r = requests.get(URL_SCRIPT, timeout=20, verify=False, headers=headers)
-                r.raise_for_status()
-                with open(LOCAL_SCRIPT, "wb") as f:
-                    f.write(r.content)
-                # Salvar nova versão
-                with open(LOCAL_VERSION_FILE, "w", encoding="utf-8") as f:
-                    f.write(versao_online)
-                logging.info(f"✅ Atualização concluída para a versão {versao_online}")
-                return True
-            except Exception as e:
-                logging.error(f"❌ Falha ao atualizar script: {e}")
-                return False
-
-        local_v = get_local_version()
-        online_v = get_online_version()
-
-        # Se não conseguiu checar a versão (sem internet), só segue com a versão local.
-        if not online_v:
-            logging.warning("⚠️ Não foi possível verificar se há atualizações. Continuando com a versão local.")
-            return
-
-        # A TRAVA DE VERSÃO: Se existir uma nova versão no GitHub
-        if online_v != local_v:
-            logging.info(f"🟡 Nova versão obrigatória detectada: {online_v} (local: {local_v}) — atualizando...")
-            
-            sucesso = atualizar_script(online_v)
-            
-            if sucesso:
-                logging.info("♻️ Reiniciando app com nova versão...")
-                subprocess.Popen([sys.executable, LOCAL_SCRIPT])
-                os._exit(0)
-            else:
-                # SE FALHAR O DOWNLOAD DA ATUALIZAÇÃO, BLOQUEIA O USO DA VERSÃO ANTIGA
-                root_temp = tk.Tk()
-                root_temp.withdraw()
-                messagebox.showerror("Atualização Obrigatória", 
-                                     f"Uma nova versão ({online_v}) foi lançada e é obrigatória para continuar.\n\n"
-                                     "Houve um erro ao baixar a atualização (possível excesso de acessos ou internet). "
-                                     "Tente novamente mais tarde. O uso desta versão desatualizada foi bloqueado por segurança.")
-                os._exit(1)
-        else:
-            logging.info(f"🟢 Aplicativo já está na versão mais recente ({local_v})")
+            logging.warning(f"⚠️ Falha ao checar status.txt (Internet/GitHub fora do ar). Ignorando trava. Erro: {e}")
 
     except Exception as e:
-        logging.error(f"❌ Erro na rotina de segurança/atualização: {e}")
+        logging.error(f"❌ Erro na rotina de segurança: {e}")
 
 
 # Variáveis globais
@@ -954,7 +892,7 @@ def criar_interface():
 
 # --- Ponto de Entrada da Aplicação ---
 if __name__ == "__main__":
-    # 1. Verifica segurança, trava e obrigação de atualização PRIMEIRO
-    verificar_seguranca_e_atualizacao()
-    # 2. Se as validações passarem, inicializa a interface
+    # 1. Verifica apenas a trava de segurança (status.txt = True/False)
+    verificar_seguranca()
+    # 2. Inicializa a interface
     criar_interface()
