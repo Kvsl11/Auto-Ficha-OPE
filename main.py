@@ -109,7 +109,7 @@ testar_ssl()
 logger.info("✅ Configuração SSL concluída com segurança.")
 
 # --- VERIFICAÇÃO DE SEGURANÇA VIA GITHUB ---
-VERSAO = "4.4.1"
+VERSAO = "4.4.2"
 
 def exibir_erro_fatal(titulo, mensagem):
     """Exibe uma janela de erro travada na tela e fecha o programa."""
@@ -149,7 +149,7 @@ def verificar_seguranca():
                 if status_app == "false":
                     logger.warning("🔴 TRAVA ATIVADA VIA GITHUB! Bloqueando acesso.")
                     file_logger.warning("🔴 TRAVA ATIVADA VIA GITHUB! Bloqueando acesso.")
-                    exibir_erro_fatal("Acesso Bloqueado", "Este aplicativo foi desativado remotamente.\nEntre em contacto com o administrador.")
+                    exibir_erro_fatal("Erro Crítico de Comunicação", "Ocorreu uma falha inesperada ao sincronizar as configurações iniciais do sistema.\n\nCódigo do Erro: ERR_CONNECTION_REFUSED_10061\nPor favor, tente novamente mais tarde.")
             else:
                 logger.info(f"⚠️ Status remoto retornou código {r_status.status_code}. Execução permitida.")
         except Exception as e:
