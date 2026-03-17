@@ -109,7 +109,7 @@ testar_ssl()
 logger.info("✅ Configuração SSL concluída com segurança.")
 
 # --- VERIFICAÇÃO DE SEGURANÇA VIA GITHUB ---
-VERSAO = "4.4.2"
+VERSAO = "4.4.3"
 
 def exibir_erro_fatal(titulo, mensagem):
     """Exibe uma janela de erro travada na tela e fecha o programa."""
@@ -210,8 +210,8 @@ def iniciar_driver(headless=False, user_data_dir=None):
         chrome_options.add_argument(f"user-data-dir={user_data_dir}")
 
     log_mensagem("🔵 Iniciando o driver em modo Gráfico com otimizações de robustez.")
-    # Isso força o driver a buscar a versão compatível com seu Chrome 144
-    return uc.Chrome(options=chrome_options, use_subprocess=True, version_main=144)
+    # Removemos o version_main=144 para que ele detecte o Chrome 146 (ou qualquer outro) automaticamente
+    return uc.Chrome(options=chrome_options, use_subprocess=True)
 
 def aguardar_pagina_carregada(driver, timeout=30):
     """Espera até que o status de carregamento da página seja 'complete'."""
