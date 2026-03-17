@@ -109,7 +109,7 @@ testar_ssl()
 logger.info("✅ Configuração SSL concluída com segurança.")
 
 # --- VERIFICAÇÃO DE SEGURANÇA VIA GITHUB ---
-VERSAO = "4.4.3"
+VERSAO = "4.4.4"
 
 def exibir_erro_fatal(titulo, mensagem):
     """Exibe uma janela de erro travada na tela e fecha o programa."""
@@ -515,7 +515,7 @@ def clicar_nas_checkboxes(driver, xpath_tabela, xpath_checkbox, xpath_checkbox_r
     if tipo_logica.get() == 'Tipo 1':
         return clicar_nas_checkboxes_tipo_1(driver, xpath_tabela, xpath_checkbox_relativo, xpath_fazenda, xpath_zona, xpath_talhao, xpath_botao_alterar, xpath_aba)
     elif tipo_logica.get() == 'Tipo 2':
-        return clicar_nas_checkboxes_tipo_2(driver, xpath_tabela, xpath_checkbox_relativo, xpath_fazenda, xpath_zona, xpath_talhao, xpath_botao_alterar, xpath_aba)
+        return clicar_nas_checkboxes_tipo_2(driver, xpath_tabela, xpath_checkbox, xpath_fazenda, xpath_zona, xpath_talhao, xpath_botao_alterar, xpath_aba)
 
 def aguardar_linhas_carregadas(driver, xpath_tabela, timeout=30):
     """Espera até que a tabela tenha pelo menos uma linha."""
