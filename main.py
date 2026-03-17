@@ -126,7 +126,7 @@ def verificar_seguranca():
     Bloqueia o app caso esteja desativado remotamente.
     """
     try:
-        REPO = "Kvsl11/Hxg_auto"
+        REPO = "Kvsl11/Auto-Ficha-OPE"
         # BURLADOR DE CACHE: Adiciona o timestamp na URL para pegar sempre a última alteração na hora
         ts = int(time.time()) 
         URL_STATUS = f"https://raw.githubusercontent.com/{REPO}/main/status.txt?t={ts}"
