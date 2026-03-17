@@ -19,10 +19,7 @@ import urllib.request
 import logging
 import sys
 import requests
-import tkinter as tk
-from tkinter import messagebox
 import webbrowser
-
 
 # --- Verifica e usa Python interno automaticamente ---
 app_dir = os.path.dirname(os.path.abspath(__file__))
@@ -33,7 +30,6 @@ if "Python313" not in sys.executable and os.path.exists(python_exe):
     print("🟢 Usando Python interno (embutido na pasta)...")
     subprocess.run([python_exe, os.path.abspath(__file__)])
     sys.exit(0)
-
 
 # Configuração de logs
 logging.basicConfig(
@@ -105,97 +101,64 @@ def testar_ssl():
         logger.warning(f"⚠️ Erro genérico ao testar SSL: {e}. Aplicando fallback.")
         ssl._create_default_https_context = ssl._create_unverified_context
 
-# Execução automática
+# Execução automática de configuração SSL
 logger.info("🚀 Iniciando verificação e correção SSL híbrida...")
 atualizar_certifi()
 garantir_certificados_amazon()
 testar_ssl()
 logger.info("✅ Configuração SSL concluída com segurança.")
 
-# --- VERIFICAÇÃO DE ATUALIZAÇÃO VIA GITHUB ---
-VERSAO = "4.3.2"
+# --- VERIFICAÇÃO DE SEGURANÇA VIA GITHUB ---
+VERSAO = "4.3.9"
 
-def verificar_e_atualizar_automaticamente():
+def exibir_erro_fatal(titulo, mensagem):
+    """Exibe uma janela de erro travada na tela e fecha o programa."""
+    root_temp = tk.Tk()
+    root_temp.withdraw()
+    root_temp.attributes("-topmost", True) # Garante que a mensagem apareça em cima de tudo
+    messagebox.showerror(titulo, mensagem)
+    root_temp.destroy()
+    os._exit(1)
+
+def verificar_seguranca():
     """
-    Verifica no GitHub se há nova versão e atualiza automaticamente sem interação do usuário.
+    Verifica a trava de segurança (status.txt).
+    Bloqueia o app caso esteja desativado remotamente.
     """
     try:
         REPO = "Kvsl11/Hxg_auto"
-        URL_VERSION = f"https://raw.githubusercontent.com/{REPO}/main/version.txt"
-        URL_SCRIPT = f"https://raw.githubusercontent.com/{REPO}/main/main.py"
-        LOCAL_SCRIPT = os.path.join(os.path.dirname(__file__), "main.py")
-        LOCAL_VERSION_FILE = os.path.join(os.path.dirname(__file__), "version_local.txt")
+        # BURLADOR DE CACHE: Adiciona o timestamp na URL para pegar sempre a última alteração na hora
+        ts = int(time.time()) 
+        URL_STATUS = f"https://raw.githubusercontent.com/{REPO}/main/status.txt?t={ts}"
         LOG_PATH = os.path.join(os.path.dirname(__file__), "autoupdate.log")
 
-        logging.basicConfig(
-            filename=LOG_PATH,
-            level=logging.INFO,
-            format="%(asctime)s - %(levelname)s - %(message)s"
-        )
+        # Configura o logger do arquivo separadamente se necessário
+        file_logger = logging.getLogger("autoupdate")
+        if not file_logger.handlers:
+            fh = logging.FileHandler(LOG_PATH)
+            fh.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
+            file_logger.addHandler(fh)
+            file_logger.setLevel(logging.INFO)
 
-        def get_local_version():
-            if os.path.exists(LOCAL_VERSION_FILE):
-                try:
-                    with open(LOCAL_VERSION_FILE, "r", encoding="utf-8") as f:
-                        return f.read().strip()
-                except Exception:
-                    return "0.0.0"
-            return "0.0.0"
-
-        def get_online_version():
-            try:
-                headers = {"Cache-Control": "no-cache", "Pragma": "no-cache"}
-                r = requests.get(URL_VERSION, timeout=10, verify=False, headers=headers)
-                if r.status_code == 200:
-                    return r.text.strip()
-                else:
-                    logging.warning(f"⚠️ Falha HTTP ao buscar versão: {r.status_code}")
-            except Exception as e:
-                logging.warning(f"⚠️ Falha ao obter versão online: {e}")
-            return None
-
-        def save_local_version(ver):
-            try:
-                with open(LOCAL_VERSION_FILE, "w", encoding="utf-8") as f:
-                    f.write(ver)
-                logging.info(f"✅ Versão local atualizada para {ver}")
-            except Exception as e:
-                logging.error(f"❌ Erro ao salvar versão local: {e}")
-
-        def atualizar_script(versao_online):
-            try:
-                headers = {"Cache-Control": "no-cache", "Pragma": "no-cache"}
-                r = requests.get(URL_SCRIPT, timeout=20, verify=False, headers=headers)
-                r.raise_for_status()
-                with open(LOCAL_SCRIPT, "wb") as f:
-                    f.write(r.content)
-                save_local_version(versao_online)
-                logging.info(f"✅ Atualização concluída para a versão {versao_online}")
-                return True
-            except Exception as e:
-                logging.error(f"❌ Falha ao atualizar script: {e}")
-                return False
-
-        local_v = get_local_version()
-        online_v = get_online_version()
-
-        if not online_v:
-            logging.warning("⚠️ Falha ao verificar versão online. Continuando com a versão local.")
-            return
-
-        if online_v != local_v:
-            logging.info(f"🟡 Nova versão detectada: {online_v} (local: {local_v}) — atualizando...")
-            sucesso = atualizar_script(online_v)
-            if sucesso:
-                logging.info("♻️ Reiniciando app com nova versão...")
-                python_exe = sys.executable
-                subprocess.Popen([python_exe, LOCAL_SCRIPT])
-                os._exit(0)
-        else:
-            logging.info(f"🟢 Aplicativo já está atualizado ({local_v})")
+        # 1. VERIFICAR A TRAVA DE SEGURANÇA (KILL SWITCH)
+        try:
+            headers = {"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache"}
+            r_status = requests.get(URL_STATUS, timeout=10, verify=False, headers=headers)
+            if r_status.status_code == 200:
+                status_app = r_status.text.strip().lower()
+                if status_app == "false":
+                    logger.warning("🔴 TRAVA ATIVADA VIA GITHUB! Bloqueando acesso.")
+                    file_logger.warning("🔴 TRAVA ATIVADA VIA GITHUB! Bloqueando acesso.")
+                    exibir_erro_fatal("Acesso Bloqueado", "Este aplicativo foi desativado remotamente.\nEntre em contacto com o administrador.")
+            else:
+                logger.info(f"⚠️ Status remoto retornou código {r_status.status_code}. Execução permitida.")
+        except Exception as e:
+            logger.warning(f"⚠️ Falha ao checar status.txt (Internet/GitHub fora do ar). Ignorando trava. Erro: {e}")
+            file_logger.warning(f"⚠️ Falha ao checar status.txt (Internet/GitHub fora do ar). Ignorando trava. Erro: {e}")
 
     except Exception as e:
-        logging.error(f"❌ Erro na verificação automática de atualização: {e}")
+        logger.error(f"❌ Erro na rotina de segurança: {e}")
+
 
 # Variáveis globais
 executando = False
@@ -247,7 +210,8 @@ def iniciar_driver(headless=False, user_data_dir=None):
         chrome_options.add_argument(f"user-data-dir={user_data_dir}")
 
     log_mensagem("🔵 Iniciando o driver em modo Gráfico com otimizações de robustez.")
-    return uc.Chrome(options=chrome_options, use_subprocess=True)
+    # Isso força o driver a buscar a versão compatível com seu Chrome 144
+    return uc.Chrome(options=chrome_options, use_subprocess=True, version_main=144)
 
 def aguardar_pagina_carregada(driver, timeout=30):
     """Espera até que o status de carregamento da página seja 'complete'."""
@@ -551,7 +515,7 @@ def clicar_nas_checkboxes(driver, xpath_tabela, xpath_checkbox, xpath_checkbox_r
     if tipo_logica.get() == 'Tipo 1':
         return clicar_nas_checkboxes_tipo_1(driver, xpath_tabela, xpath_checkbox_relativo, xpath_fazenda, xpath_zona, xpath_talhao, xpath_botao_alterar, xpath_aba)
     elif tipo_logica.get() == 'Tipo 2':
-        return clicar_nas_checkboxes_tipo_2(driver, xpath_tabela, xpath_checkbox, xpath_fazenda, xpath_zona, xpath_talhao, xpath_botao_alterar, xpath_aba)
+        return clicar_nas_checkboxes_tipo_2(driver, xpath_tabela, xpath_checkbox_relativo, xpath_fazenda, xpath_zona, xpath_talhao, xpath_botao_alterar, xpath_aba)
 
 def aguardar_linhas_carregadas(driver, xpath_tabela, timeout=30):
     """Espera até que a tabela tenha pelo menos uma linha."""
@@ -816,7 +780,7 @@ def criar_interface():
     
     entry_usuario = ctk.CTkEntry(credentials_frame, placeholder_text="Usuário", fg_color="#FFFFFF", border_color="#7f7f7f", text_color=PALETTE_TEXT)
     entry_usuario.pack(pady=5, padx=20, fill="x")
-       
+        
     entry_senha = ctk.CTkEntry(credentials_frame, placeholder_text="Senha", show="*", fg_color="#FFFFFF", border_color="#7f7f7f", text_color=PALETTE_TEXT)
     entry_senha.pack(pady=5, padx=20, fill="x")
     
@@ -938,4 +902,7 @@ def criar_interface():
 
 # --- Ponto de Entrada da Aplicação ---
 if __name__ == "__main__":
+    # 1. Verifica apenas a trava de segurança (status.txt = True/False)
+    verificar_seguranca()
+    # 2. Inicializa a interface
     criar_interface()

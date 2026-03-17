@@ -101,7 +101,7 @@ def testar_ssl():
         logger.warning(f"⚠️ Erro genérico ao testar SSL: {e}. Aplicando fallback.")
         ssl._create_default_https_context = ssl._create_unverified_context
 
-# Execução automática
+# Execução automática de configuração SSL
 logger.info("🚀 Iniciando verificação e correção SSL híbrida...")
 atualizar_certifi()
 garantir_certificados_amazon()
@@ -132,7 +132,13 @@ def verificar_seguranca():
         URL_STATUS = f"https://raw.githubusercontent.com/{REPO}/main/status.txt?t={ts}"
         LOG_PATH = os.path.join(os.path.dirname(__file__), "autoupdate.log")
 
-        logging.basicConfig(filename=LOG_PATH, level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+        # Configura o logger do arquivo separadamente se necessário
+        file_logger = logging.getLogger("autoupdate")
+        if not file_logger.handlers:
+            fh = logging.FileHandler(LOG_PATH)
+            fh.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
+            file_logger.addHandler(fh)
+            file_logger.setLevel(logging.INFO)
 
         # 1. VERIFICAR A TRAVA DE SEGURANÇA (KILL SWITCH)
         try:
@@ -141,13 +147,17 @@ def verificar_seguranca():
             if r_status.status_code == 200:
                 status_app = r_status.text.strip().lower()
                 if status_app == "false":
-                    logging.warning("🔴 TRAVA ATIVADA VIA GITHUB! Bloqueando acesso.")
+                    logger.warning("🔴 TRAVA ATIVADA VIA GITHUB! Bloqueando acesso.")
+                    file_logger.warning("🔴 TRAVA ATIVADA VIA GITHUB! Bloqueando acesso.")
                     exibir_erro_fatal("Acesso Bloqueado", "Este aplicativo foi desativado remotamente.\nEntre em contacto com o administrador.")
+            else:
+                logger.info(f"⚠️ Status remoto retornou código {r_status.status_code}. Execução permitida.")
         except Exception as e:
-            logging.warning(f"⚠️ Falha ao checar status.txt (Internet/GitHub fora do ar). Ignorando trava. Erro: {e}")
+            logger.warning(f"⚠️ Falha ao checar status.txt (Internet/GitHub fora do ar). Ignorando trava. Erro: {e}")
+            file_logger.warning(f"⚠️ Falha ao checar status.txt (Internet/GitHub fora do ar). Ignorando trava. Erro: {e}")
 
     except Exception as e:
-        logging.error(f"❌ Erro na rotina de segurança: {e}")
+        logger.error(f"❌ Erro na rotina de segurança: {e}")
 
 
 # Variáveis globais
@@ -200,7 +210,7 @@ def iniciar_driver(headless=False, user_data_dir=None):
         chrome_options.add_argument(f"user-data-dir={user_data_dir}")
 
     log_mensagem("🔵 Iniciando o driver em modo Gráfico com otimizações de robustez.")
-   # Isso força o driver a buscar a versão compatível com seu Chrome 144
+    # Isso força o driver a buscar a versão compatível com seu Chrome 144
     return uc.Chrome(options=chrome_options, use_subprocess=True, version_main=144)
 
 def aguardar_pagina_carregada(driver, timeout=30):
@@ -505,7 +515,7 @@ def clicar_nas_checkboxes(driver, xpath_tabela, xpath_checkbox, xpath_checkbox_r
     if tipo_logica.get() == 'Tipo 1':
         return clicar_nas_checkboxes_tipo_1(driver, xpath_tabela, xpath_checkbox_relativo, xpath_fazenda, xpath_zona, xpath_talhao, xpath_botao_alterar, xpath_aba)
     elif tipo_logica.get() == 'Tipo 2':
-        return clicar_nas_checkboxes_tipo_2(driver, xpath_tabela, xpath_checkbox, xpath_fazenda, xpath_zona, xpath_talhao, xpath_botao_alterar, xpath_aba)
+        return clicar_nas_checkboxes_tipo_2(driver, xpath_tabela, xpath_checkbox_relativo, xpath_fazenda, xpath_zona, xpath_talhao, xpath_botao_alterar, xpath_aba)
 
 def aguardar_linhas_carregadas(driver, xpath_tabela, timeout=30):
     """Espera até que a tabela tenha pelo menos uma linha."""
@@ -770,7 +780,7 @@ def criar_interface():
     
     entry_usuario = ctk.CTkEntry(credentials_frame, placeholder_text="Usuário", fg_color="#FFFFFF", border_color="#7f7f7f", text_color=PALETTE_TEXT)
     entry_usuario.pack(pady=5, padx=20, fill="x")
-       
+        
     entry_senha = ctk.CTkEntry(credentials_frame, placeholder_text="Senha", show="*", fg_color="#FFFFFF", border_color="#7f7f7f", text_color=PALETTE_TEXT)
     entry_senha.pack(pady=5, padx=20, fill="x")
     
