@@ -20,6 +20,8 @@ import logging
 import sys
 import requests
 import webbrowser
+import winreg  # Adicionado para ler a versão do Chrome no Windows
+import shutil  # Adicionado para limpar cache do ChromeDriver
 
 # --- Verifica e usa Python interno automaticamente ---
 app_dir = os.path.dirname(os.path.abspath(__file__))
@@ -109,7 +111,7 @@ testar_ssl()
 logger.info("✅ Configuração SSL concluída com segurança.")
 
 # --- VERIFICAÇÃO DE SEGURANÇA VIA GITHUB ---
-VERSAO = "4.4.4"
+VERSAO = "4.4.5"
 
 def exibir_erro_fatal(titulo, mensagem):
     """Exibe uma janela de erro travada na tela e fecha o programa."""
@@ -159,7 +161,6 @@ def verificar_seguranca():
     except Exception as e:
         logger.error(f"❌ Erro na rotina de segurança: {e}")
 
-
 # Variáveis globais
 executando = False
 continuar_execucao = False
@@ -190,8 +191,42 @@ def obter_caminho_imagem(nome_imagem):
         pasta = os.path.dirname(os.path.abspath(__file__))
     return os.path.join(pasta, "imagens", nome_imagem)
 
+# --- INÍCIO DAS CORREÇÕES DE ATUALIZAÇÃO DO CHROME ---
+def obter_versao_principal_chrome():
+    """Detecta a versão principal do Chrome instalada no Windows via Registro."""
+    try:
+        # Tenta HKEY_CURRENT_USER primeiro
+        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Google\Chrome\BLBeacon")
+        version, _ = winreg.QueryValueEx(key, "version")
+        return int(version.split('.')[0])
+    except Exception:
+        pass
+    try:
+        # Tenta HKEY_LOCAL_MACHINE como fallback
+        key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"Software\Google\Chrome\BLBeacon")
+        version, _ = winreg.QueryValueEx(key, "version")
+        return int(version.split('.')[0])
+    except Exception:
+        return None
+
+def limpar_cache_uc():
+    """Limpa a pasta de cache do undetected_chromedriver para evitar drivers zumbis."""
+    try:
+        # 1. Mata processos zumbis que impedem a limpeza do cache
+        if os.name == 'nt':
+            os.system("taskkill /f /im undetected_chromedriver.exe /T >nul 2>&1")
+            
+        # 2. Deleta a pasta de cache
+        user_data = os.path.join(os.environ.get('APPDATA', ''), 'undetected_chromedriver')
+        if os.path.exists(user_data):
+            shutil.rmtree(user_data, ignore_errors=True)
+            logger.info("🗑️ Cache de drivers antigos do undetected_chromedriver limpo.")
+    except Exception as e:
+        logger.warning(f"⚠️ Não foi possível limpar o cache do driver: {e}")
+# --- FIM DAS CORREÇÕES DE ATUALIZAÇÃO DO CHROME ---
+
 def iniciar_driver(headless=False, user_data_dir=None):
-    """Inicia o WebDriver para o Chrome."""
+    """Inicia o WebDriver para o Chrome de forma resiliente."""
     chrome_options = Options()
     chrome_options.add_argument("--disable-gpu")
     chrome_options.add_argument("--start-maximized")
@@ -209,9 +244,36 @@ def iniciar_driver(headless=False, user_data_dir=None):
     if user_data_dir:
         chrome_options.add_argument(f"user-data-dir={user_data_dir}")
 
-    log_mensagem("🔵 Iniciando o driver em modo Gráfico com otimizações de robustez.")
-    # Removemos o version_main=144 para que ele detecte o Chrome 146 (ou qualquer outro) automaticamente
-    return uc.Chrome(options=chrome_options, use_subprocess=True)
+    log_mensagem("🔵 Identificando versão do Chrome e preparando driver...")
+    
+    # Descobre a versão exata
+    versao_chrome = obter_versao_principal_chrome()
+
+    # Loop de tentativas para garantir que o navegador abra sem erro de "Browser window not found"
+    for tentativa in range(3):
+        try:
+            limpar_cache_uc() # Limpa o cache problemático antes de tentar
+            
+            if versao_chrome:
+                log_mensagem(f"🔍 Chrome v{versao_chrome} detectado. Iniciando (Tentativa {tentativa+1}/3)...")
+                driver = uc.Chrome(options=chrome_options, version_main=versao_chrome, use_subprocess=True)
+            else:
+                log_mensagem(f"⚠️ Versão não detectada no registro. Modo automático (Tentativa {tentativa+1}/3)...")
+                driver = uc.Chrome(options=chrome_options, use_subprocess=True)
+            
+            # Testa se o driver realmente está conectado à janela (evita o erro -32000)
+            time.sleep(1)
+            driver.current_url
+            return driver
+            
+        except Exception as e:
+            log_mensagem(f"⚠️ Erro ao iniciar na tentativa {tentativa+1}. Detalhes: {e}")
+            if 'driver' in locals() and driver:
+                try: driver.quit()
+                except: pass
+            time.sleep(2) # Pausa antes de tentar novamente
+            
+    raise Exception("Falha definitiva ao abrir o navegador após múltiplas tentativas. Verifique a instalação do Chrome.")
 
 def aguardar_pagina_carregada(driver, timeout=30):
     """Espera até que o status de carregamento da página seja 'complete'."""
@@ -610,8 +672,15 @@ def executar_script(usuario, senha):
         return
 
     try:
-        driver.maximize_window()
-        log_mensagem("🟢 Janela do navegador maximizada.")
+        # Atraso essencial para evitar o erro "Browser window not found (-32000)"
+        time.sleep(2) 
+        
+        # Proteção robusta contra crash ao tentar maximizar
+        try:
+            driver.maximize_window()
+            log_mensagem("🟢 Janela do navegador maximizada.")
+        except Exception as max_e:
+            log_mensagem(f"🟡 Aviso: O navegador já abriu maximizado ou ignorou o comando de maximizar.")
         
         # --- Definições de XPATHs e URLs ---
         url = "https://adecoagro.saas-solinftec.com/#!/login/"
