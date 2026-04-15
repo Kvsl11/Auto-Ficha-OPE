@@ -111,7 +111,7 @@ testar_ssl()
 logger.info("✅ Configuração SSL concluída com segurança.")
 
 # --- VERIFICAÇÃO DE SEGURANÇA VIA GITHUB ---
-VERSAO = "4.4.5"
+VERSAO = "4.4.6"
 
 def exibir_erro_fatal(titulo, mensagem):
     """Exibe uma janela de erro travada na tela e fecha o programa."""
@@ -226,54 +226,92 @@ def limpar_cache_uc():
 # --- FIM DAS CORREÇÕES DE ATUALIZAÇÃO DO CHROME ---
 
 def iniciar_driver(headless=False, user_data_dir=None):
-    """Inicia o WebDriver para o Chrome de forma resiliente."""
+    """Inicia o WebDriver para o Chrome de forma robusta e sem erro de maximização."""
+    
     chrome_options = Options()
+
+    # --- Configurações essenciais ---
     chrome_options.add_argument("--disable-gpu")
-    chrome_options.add_argument("--start-maximized")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-software-rasterizer")
     chrome_options.add_argument("--disable-background-timer-throttling")
     chrome_options.add_argument("--disable-backgrounding-occluded-windows")
     chrome_options.add_argument("--disable-renderer-backgrounding")
-    
+
+    # 🔥 Substitui start-maximized (mais confiável)
+    chrome_options.add_argument("--window-size=1920,1080")
+
     if headless:
-        chrome_options.add_argument("--headless")
+        chrome_options.add_argument("--headless=new")
         chrome_options.add_argument("--window-size=1920,1080")
-        
+
     if user_data_dir:
-        chrome_options.add_argument(f"user-data-dir={user_data_dir}")
+        chrome_options.add_argument(f"--user-data-dir={user_data_dir}")
 
     log_mensagem("🔵 Identificando versão do Chrome e preparando driver...")
-    
-    # Descobre a versão exata
+
     versao_chrome = obter_versao_principal_chrome()
 
-    # Loop de tentativas para garantir que o navegador abra sem erro de "Browser window not found"
     for tentativa in range(3):
         try:
-            limpar_cache_uc() # Limpa o cache problemático antes de tentar
-            
+            limpar_cache_uc()
+
+            # --- Inicialização do driver ---
             if versao_chrome:
-                log_mensagem(f"🔍 Chrome v{versao_chrome} detectado. Iniciando (Tentativa {tentativa+1}/3)...")
-                driver = uc.Chrome(options=chrome_options, version_main=versao_chrome, use_subprocess=True)
+                log_mensagem(f"🔍 Chrome v{versao_chrome} detectado. Tentativa {tentativa+1}/3...")
+                driver = uc.Chrome(
+                    options=chrome_options,
+                    version_main=versao_chrome
+                )
             else:
-                log_mensagem(f"⚠️ Versão não detectada no registro. Modo automático (Tentativa {tentativa+1}/3)...")
-                driver = uc.Chrome(options=chrome_options, use_subprocess=True)
-            
-            # Testa se o driver realmente está conectado à janela (evita o erro -32000)
-            time.sleep(1)
-            driver.current_url
+                log_mensagem(f"⚠️ Versão não detectada. Tentativa {tentativa+1}/3...")
+                driver = uc.Chrome(options=chrome_options)
+
+            # 🔥 Aguarda o Chrome realmente iniciar
+            time.sleep(2)
+
+            # --- GARANTE QUE A JANELA EXISTE (CORREÇÃO DO ERRO -32000) ---
+            for _ in range(10):
+                try:
+                    handles = driver.window_handles
+                    if handles:
+                        break
+                except:
+                    pass
+                time.sleep(0.5)
+
+            # --- Maximização SEGURA ---
+            try:
+                driver.switch_to.window(driver.window_handles[0])
+                driver.set_window_position(0, 0)
+                driver.set_window_size(1920, 1080)
+                driver.maximize_window()
+                log_mensagem("🟢 Navegador maximizado com sucesso (modo seguro).")
+            except Exception as e:
+                log_mensagem(f"🟡 Falha no maximize padrão: {e}")
+                try:
+                    driver.execute_script(
+                        "window.moveTo(0,0); window.resizeTo(screen.width, screen.height);"
+                    )
+                    log_mensagem("🟢 Maximização via JavaScript aplicada.")
+                except Exception as js_e:
+                    log_mensagem(f"⚠️ Falha total ao maximizar: {js_e}")
+
+            # --- Teste final de conexão ---
+            _ = driver.current_url
+
             return driver
-            
+
         except Exception as e:
-            log_mensagem(f"⚠️ Erro ao iniciar na tentativa {tentativa+1}. Detalhes: {e}")
-            if 'driver' in locals() and driver:
-                try: driver.quit()
-                except: pass
-            time.sleep(2) # Pausa antes de tentar novamente
-            
-    raise Exception("Falha definitiva ao abrir o navegador após múltiplas tentativas. Verifique a instalação do Chrome.")
+            log_mensagem(f"⚠️ Erro ao iniciar (Tentativa {tentativa+1}): {e}")
+            try:
+                driver.quit()
+            except:
+                pass
+            time.sleep(2)
+
+    raise Exception("❌ Falha definitiva ao abrir o navegador após múltiplas tentativas.")
 
 def aguardar_pagina_carregada(driver, timeout=30):
     """Espera até que o status de carregamento da página seja 'complete'."""
