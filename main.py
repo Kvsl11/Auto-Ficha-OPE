@@ -111,7 +111,7 @@ testar_ssl()
 logger.info("✅ Configuração SSL concluída com segurança.")
 
 # --- VERIFICAÇÃO DE SEGURANÇA VIA GITHUB ---
-VERSAO = "4.4.6"
+VERSAO = "4.4.7"
 
 def exibir_erro_fatal(titulo, mensagem):
     """Exibe uma janela de erro travada na tela e fecha o programa."""
