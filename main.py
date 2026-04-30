@@ -111,7 +111,7 @@ testar_ssl()
 logger.info("✅ Configuração SSL concluída com segurança.")
 
 # --- VERIFICAÇÃO DE SEGURANÇA VIA GITHUB ---
-VERSAO = "4.4.7"
+VERSAO = "4.4.8"
 
 def exibir_erro_fatal(titulo, mensagem):
     """Exibe uma janela de erro travada na tela e fecha o programa."""
@@ -268,14 +268,18 @@ def iniciar_driver(headless=False, user_data_dir=None):
                 log_mensagem(f"⚠️ Versão não detectada. Tentativa {tentativa+1}/3...")
                 driver = uc.Chrome(options=chrome_options)
 
-            # 🔥 Aguarda o Chrome realmente iniciar
+            # 🔥 CORREÇÃO: Forçar a criação do contexto da janela antes de interagir
             time.sleep(2)
+            try:
+                driver.get("data:,") # Carrega uma página estática vazia estabilizando a janela
+            except:
+                pass
 
-            # --- GARANTE QUE A JANELA EXISTE (CORREÇÃO DO ERRO -32000) ---
+            # --- GARANTE QUE A JANELA EXISTE ---
             for _ in range(10):
                 try:
-                    handles = driver.window_handles
-                    if handles:
+                    if len(driver.window_handles) > 0:
+                        driver.switch_to.window(driver.window_handles[0])
                         break
                 except:
                     pass
@@ -283,17 +287,12 @@ def iniciar_driver(headless=False, user_data_dir=None):
 
             # --- Maximização SEGURA ---
             try:
-                driver.switch_to.window(driver.window_handles[0])
-                driver.set_window_position(0, 0)
-                driver.set_window_size(1920, 1080)
                 driver.maximize_window()
                 log_mensagem("🟢 Navegador maximizado com sucesso (modo seguro).")
             except Exception as e:
                 log_mensagem(f"🟡 Falha no maximize padrão: {e}")
                 try:
-                    driver.execute_script(
-                        "window.moveTo(0,0); window.resizeTo(screen.width, screen.height);"
-                    )
+                    driver.execute_script("window.moveTo(0,0); window.resizeTo(screen.width, screen.height);")
                     log_mensagem("🟢 Maximização via JavaScript aplicada.")
                 except Exception as js_e:
                     log_mensagem(f"⚠️ Falha total ao maximizar: {js_e}")
@@ -302,7 +301,7 @@ def iniciar_driver(headless=False, user_data_dir=None):
             _ = driver.current_url
 
             return driver
-
+        
         except Exception as e:
             log_mensagem(f"⚠️ Erro ao iniciar (Tentativa {tentativa+1}): {e}")
             try:
