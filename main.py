@@ -111,7 +111,7 @@ testar_ssl()
 logger.info("✅ Configuração SSL concluída com segurança.")
 
 # --- VERIFICAÇÃO DE SEGURANÇA VIA GITHUB ---
-VERSAO = "4.5.0"
+VERSAO = "4.5.1"
 
 def exibir_erro_fatal(titulo, mensagem):
     """Exibe uma janela de erro travada na tela e fecha o programa."""
@@ -226,7 +226,7 @@ def limpar_cache_uc():
 # --- FIM DAS CORREÇÕES DE ATUALIZAÇÃO DO CHROME ---
 
 def iniciar_driver(headless=False, user_data_dir=None):
-    """Inicia o WebDriver para o Chrome de forma robusta e com maximização forçada."""
+    """Inicia o WebDriver para o Chrome de forma robusta e limpa."""
     
     chrome_options = Options()
 
@@ -235,10 +235,8 @@ def iniciar_driver(headless=False, user_data_dir=None):
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-software-rasterizer")
-    chrome_options.add_argument("--disable-background-timer-throttling")
-    chrome_options.add_argument("--disable-backgrounding-occluded-windows")
-    chrome_options.add_argument("--disable-renderer-backgrounding")
     chrome_options.add_argument("--start-maximized")
+    chrome_options.add_argument("--window-size=1920,1080")
 
     if headless:
         chrome_options.add_argument("--headless=new")
@@ -265,40 +263,12 @@ def iniciar_driver(headless=False, user_data_dir=None):
                 log_mensagem(f"⚠️ Versão não detectada. Tentativa {tentativa+1}/3...")
                 driver = uc.Chrome(options=chrome_options)
 
-            # 🔥 Estabilizador de tela: carrega uma página vazia rápida antes de prosseguir
+            # Aguarda o processo do Chrome estabilizar na memória
             time.sleep(2)
-            try:
-                driver.get("data:,")
-            except:
-                pass
 
-            # --- GARANTE QUE A JANELA EXISTE ---
-            for _ in range(10):
-                try:
-                    handles = driver.window_handles
-                    if handles:
-                        driver.switch_to.window(handles[0])
-                        break
-                except:
-                    pass
-                time.sleep(0.5)
-
-            # 🔥 FORÇAR MAXIMIZAÇÃO SEGURA (Comando Nativo + Fallback JS)
-            time.sleep(1) # Dá um fôlego para o navegador desenhar a janela no Windows
-            try:
-                driver.maximize_window()
-                log_mensagem("🟢 Janela maximizada com sucesso (Comando nativo).")
-            except Exception as e:
-                log_mensagem(f"🟡 Aviso nativo (tentando JS): {e}")
-                try:
-                    # Se o comando do Selenium falhar, injetamos um script direto no navegador
-                    driver.execute_script("window.moveTo(0, 0); window.resizeTo(screen.availWidth, screen.availHeight);")
-                    log_mensagem("🟢 Janela maximizada com sucesso (Via JavaScript).")
-                except Exception as js_e:
-                    log_mensagem(f"⚠️ Falha ao maximizar tela: {js_e}")
-
-            # --- Teste final de conexão ---
-            _ = driver.current_url
+            # Apenas foca na janela inicial, sem forçar navegação ou maximização
+            if driver.window_handles:
+                driver.switch_to.window(driver.window_handles[0])
 
             return driver
 
@@ -701,7 +671,7 @@ def executar_script(usuario, senha):
     try:
         driver = iniciar_driver()
     except Exception as e:
-        log_mensagem(f"🔴 Erro Crítico: Falha ao iniciar o WebDriver. Verifique a instalação do Chrome e do chromedriver.")
+        log_mensagem(f"🔴 Erro Crítico: Falha ao iniciar o WebDriver.")
         log_mensagem(f"🔴 Detalhes do erro: {e}")
         messagebox.showerror("Erro Crítico", f"Não foi possível iniciar o navegador. O programa será encerrado.\n\nDetalhes: {e}")
         executando = False
@@ -709,9 +679,6 @@ def executar_script(usuario, senha):
         return
 
     try:
-        # Atraso essencial para evitar o erro "Browser window not found (-32000)"
-        time.sleep(2) 
-        
         # --- Definições de XPATHs e URLs ---
         url = "https://adecoagro.saas-solinftec.com/#!/login/"
         xpath_usuario = '/html/body/div[1]/div/div/div/div/form/fieldset/section[1]/label[2]/input'
@@ -731,8 +698,24 @@ def executar_script(usuario, senha):
         xpath_aba = '/html/body/div[1]/div/div/div/div[3]/div[1]/nav/span/ul/li[3]/a'
         # --- Fim das Definições ---
 
+        # 1. Acessa o site PRIMEIRO
+        log_mensagem("🔵 Acessando o portal Adecoagro...")
         driver.get(url)
         aguardar_pagina_carregada(driver)
+        
+        # 2. Só agora tenta maximizar (evita o erro -32000 porque a janela já está renderizada)
+        time.sleep(1)
+        try:
+            driver.maximize_window()
+            log_mensagem("🟢 Janela maximizada (Comando nativo).")
+        except Exception as max_e:
+            log_mensagem("🟡 Comando nativo ignorado, forçando tela cheia via script...")
+            try:
+                driver.execute_script("window.moveTo(0, 0); window.resizeTo(screen.availWidth, screen.availHeight);")
+            except:
+                pass
+
+        # 3. Segue o fluxo normal de login
         escrever_texto(driver, By.XPATH, xpath_usuario, usuario)
         escrever_texto(driver, By.XPATH, xpath_senha, senha)
         clicar_com_js(driver, xpath_botao_login)
