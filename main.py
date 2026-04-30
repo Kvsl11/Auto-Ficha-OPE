@@ -111,7 +111,7 @@ testar_ssl()
 logger.info("✅ Configuração SSL concluída com segurança.")
 
 # --- VERIFICAÇÃO DE SEGURANÇA VIA GITHUB ---
-VERSAO = "4.4.8"
+VERSAO = "4.4.9"
 
 def exibir_erro_fatal(titulo, mensagem):
     """Exibe uma janela de erro travada na tela e fecha o programa."""
@@ -239,12 +239,12 @@ def iniciar_driver(headless=False, user_data_dir=None):
     chrome_options.add_argument("--disable-backgrounding-occluded-windows")
     chrome_options.add_argument("--disable-renderer-backgrounding")
 
-    # 🔥 Substitui start-maximized (mais confiável)
+    # 🔥 CORREÇÃO: Faz o Chrome já abrir maximizado, evitando o bug -32000
+    chrome_options.add_argument("--start-maximized")
     chrome_options.add_argument("--window-size=1920,1080")
 
     if headless:
         chrome_options.add_argument("--headless=new")
-        chrome_options.add_argument("--window-size=1920,1080")
 
     if user_data_dir:
         chrome_options.add_argument(f"--user-data-dir={user_data_dir}")
@@ -268,40 +268,35 @@ def iniciar_driver(headless=False, user_data_dir=None):
                 log_mensagem(f"⚠️ Versão não detectada. Tentativa {tentativa+1}/3...")
                 driver = uc.Chrome(options=chrome_options)
 
-            # 🔥 CORREÇÃO: Forçar a criação do contexto da janela antes de interagir
+            # 🔥 Estabilizador de tela: carrega uma página vazia rápida antes de prosseguir
             time.sleep(2)
             try:
-                driver.get("data:,") # Carrega uma página estática vazia estabilizando a janela
+                driver.get("data:,")
             except:
                 pass
 
             # --- GARANTE QUE A JANELA EXISTE ---
             for _ in range(10):
                 try:
-                    if len(driver.window_handles) > 0:
-                        driver.switch_to.window(driver.window_handles[0])
+                    handles = driver.window_handles
+                    if handles:
                         break
                 except:
                     pass
                 time.sleep(0.5)
 
-            # --- Maximização SEGURA ---
+            # --- Focar na janela (apenas foca, sem tentar maximizar de novo) ---
             try:
-                driver.maximize_window()
-                log_mensagem("🟢 Navegador maximizado com sucesso (modo seguro).")
+                driver.switch_to.window(driver.window_handles[0])
+                log_mensagem("🟢 Navegador iniciado e focado com sucesso.")
             except Exception as e:
-                log_mensagem(f"🟡 Falha no maximize padrão: {e}")
-                try:
-                    driver.execute_script("window.moveTo(0,0); window.resizeTo(screen.width, screen.height);")
-                    log_mensagem("🟢 Maximização via JavaScript aplicada.")
-                except Exception as js_e:
-                    log_mensagem(f"⚠️ Falha total ao maximizar: {js_e}")
+                log_mensagem(f"🟡 Aviso ao focar janela: {e}")
 
             # --- Teste final de conexão ---
             _ = driver.current_url
 
             return driver
-        
+
         except Exception as e:
             log_mensagem(f"⚠️ Erro ao iniciar (Tentativa {tentativa+1}): {e}")
             try:
@@ -711,13 +706,6 @@ def executar_script(usuario, senha):
     try:
         # Atraso essencial para evitar o erro "Browser window not found (-32000)"
         time.sleep(2) 
-        
-        # Proteção robusta contra crash ao tentar maximizar
-        try:
-            driver.maximize_window()
-            log_mensagem("🟢 Janela do navegador maximizada.")
-        except Exception as max_e:
-            log_mensagem(f"🟡 Aviso: O navegador já abriu maximizado ou ignorou o comando de maximizar.")
         
         # --- Definições de XPATHs e URLs ---
         url = "https://adecoagro.saas-solinftec.com/#!/login/"
