@@ -111,7 +111,7 @@ testar_ssl()
 logger.info("✅ Configuração SSL concluída com segurança.")
 
 # --- VERIFICAÇÃO DE SEGURANÇA VIA GITHUB ---
-VERSAO = "4.5.2"
+VERSAO = "4.5.3"
 
 def exibir_erro_fatal(titulo, mensagem):
     """Exibe uma janela de erro travada na tela e fecha o programa."""
@@ -235,6 +235,9 @@ def iniciar_driver(headless=False, user_data_dir=None):
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-software-rasterizer")
+    chrome_options.add_argument("--start-maximized")
+    chrome_options.add_argument("--kiosk") # Alternativa: Abre em modo totem (F11) se o maximized falhar
+    chrome_options.add_argument("--force-device-scale-factor=1") # Evita que o zoom do Windows quebre o layout
     chrome_options.add_argument("--start-maximized")
     chrome_options.add_argument("--window-size=1920,1080")
 
@@ -698,22 +701,29 @@ def executar_script(usuario, senha):
         xpath_aba = '/html/body/div[1]/div/div/div/div[3]/div[1]/nav/span/ul/li[3]/a'
         # --- Fim das Definições ---
 
-        # 1. Acessa o site PRIMEIRO
+       # 1. Acessa o site
         log_mensagem("🔵 Acessando o portal Adecoagro...")
         driver.get(url)
+        
+        # 2. Força o foco e tenta maximizar de várias formas
+        time.sleep(2) # Pequena pausa para o SO processar a janela
+        try:
+            driver.set_window_rect(0, 0, 1920, 1080) # Define um tamanho fixo antes de maximizar
+            driver.maximize_window()
+            log_mensagem("🟢 Janela maximizada via Selenium.")
+        except Exception:
+            try:
+                # Fallback via JavaScript (Garante que o navegador ocupe a tela)
+                driver.execute_script("window.moveTo(0, 0); window.resizeTo(screen.availWidth, screen.availHeight);")
+                log_mensagem("🟢 Janela ajustada via JavaScript.")
+            except:
+                log_mensagem("⚠️ Não foi possível forçar tela cheia, tentando prosseguir assim mesmo.")
+
+        # 3. Aguarda o carregamento antes de tentar o login
         aguardar_pagina_carregada(driver)
         
-        # 2. Só agora tenta maximizar (evita o erro -32000 porque a janela já está renderizada)
-        time.sleep(1)
-        try:
-            driver.maximize_window()
-            log_mensagem("🟢 Janela maximizada (Comando nativo).")
-        except Exception as max_e:
-            log_mensagem("🟢 Tela cheia ativada com sucesso (via script alternativo).")
-            try:
-                driver.execute_script("window.moveTo(0, 0); window.resizeTo(screen.availWidth, screen.availHeight);")
-            except:
-                pass
+        # 3.1. Verifica se o campo de usuário está visível antes de escrever
+        WebDriverWait(driver, 20).until(EC.visibility_of_element_located((By.XPATH, xpath_usuario)))
 
         # 3. Segue o fluxo normal de login
         escrever_texto(driver, By.XPATH, xpath_usuario, usuario)
