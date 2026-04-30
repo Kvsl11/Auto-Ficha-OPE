@@ -111,7 +111,7 @@ testar_ssl()
 logger.info("✅ Configuração SSL concluída com segurança.")
 
 # --- VERIFICAÇÃO DE SEGURANÇA VIA GITHUB ---
-VERSAO = "4.4.9"
+VERSAO = "4.5.0"
 
 def exibir_erro_fatal(titulo, mensagem):
     """Exibe uma janela de erro travada na tela e fecha o programa."""
@@ -226,7 +226,7 @@ def limpar_cache_uc():
 # --- FIM DAS CORREÇÕES DE ATUALIZAÇÃO DO CHROME ---
 
 def iniciar_driver(headless=False, user_data_dir=None):
-    """Inicia o WebDriver para o Chrome de forma robusta e sem erro de maximização."""
+    """Inicia o WebDriver para o Chrome de forma robusta e com maximização forçada."""
     
     chrome_options = Options()
 
@@ -238,10 +238,7 @@ def iniciar_driver(headless=False, user_data_dir=None):
     chrome_options.add_argument("--disable-background-timer-throttling")
     chrome_options.add_argument("--disable-backgrounding-occluded-windows")
     chrome_options.add_argument("--disable-renderer-backgrounding")
-
-    # 🔥 CORREÇÃO: Faz o Chrome já abrir maximizado, evitando o bug -32000
     chrome_options.add_argument("--start-maximized")
-    chrome_options.add_argument("--window-size=1920,1080")
 
     if headless:
         chrome_options.add_argument("--headless=new")
@@ -280,17 +277,25 @@ def iniciar_driver(headless=False, user_data_dir=None):
                 try:
                     handles = driver.window_handles
                     if handles:
+                        driver.switch_to.window(handles[0])
                         break
                 except:
                     pass
                 time.sleep(0.5)
 
-            # --- Focar na janela (apenas foca, sem tentar maximizar de novo) ---
+            # 🔥 FORÇAR MAXIMIZAÇÃO SEGURA (Comando Nativo + Fallback JS)
+            time.sleep(1) # Dá um fôlego para o navegador desenhar a janela no Windows
             try:
-                driver.switch_to.window(driver.window_handles[0])
-                log_mensagem("🟢 Navegador iniciado e focado com sucesso.")
+                driver.maximize_window()
+                log_mensagem("🟢 Janela maximizada com sucesso (Comando nativo).")
             except Exception as e:
-                log_mensagem(f"🟡 Aviso ao focar janela: {e}")
+                log_mensagem(f"🟡 Aviso nativo (tentando JS): {e}")
+                try:
+                    # Se o comando do Selenium falhar, injetamos um script direto no navegador
+                    driver.execute_script("window.moveTo(0, 0); window.resizeTo(screen.availWidth, screen.availHeight);")
+                    log_mensagem("🟢 Janela maximizada com sucesso (Via JavaScript).")
+                except Exception as js_e:
+                    log_mensagem(f"⚠️ Falha ao maximizar tela: {js_e}")
 
             # --- Teste final de conexão ---
             _ = driver.current_url
