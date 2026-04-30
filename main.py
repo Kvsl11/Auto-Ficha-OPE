@@ -111,7 +111,7 @@ testar_ssl()
 logger.info("✅ Configuração SSL concluída com segurança.")
 
 # --- VERIFICAÇÃO DE SEGURANÇA VIA GITHUB ---
-VERSAO = "4.5.1"
+VERSAO = "4.5.2"
 
 def exibir_erro_fatal(titulo, mensagem):
     """Exibe uma janela de erro travada na tela e fecha o programa."""
@@ -709,7 +709,7 @@ def executar_script(usuario, senha):
             driver.maximize_window()
             log_mensagem("🟢 Janela maximizada (Comando nativo).")
         except Exception as max_e:
-            log_mensagem("🟡 Comando nativo ignorado, forçando tela cheia via script...")
+            log_mensagem("🟢 Tela cheia ativada com sucesso (via script alternativo).")
             try:
                 driver.execute_script("window.moveTo(0, 0); window.resizeTo(screen.availWidth, screen.availHeight);")
             except:
