@@ -110,7 +110,6 @@ garantir_certificados_amazon()
 testar_ssl()
 logger.info("✅ Configuração SSL concluída com segurança.")
 
-<<<<<<< HEAD:Conf_app/App_py/main.py
 # --- VERIFICAÇÃO DE SEGURANÇA VIA GITHUB ---
 VERSAO = "4.6.2"
 
@@ -128,24 +127,21 @@ def verificar_seguranca():
     Verifica a trava de segurança (status.txt).
     Bloqueia o app caso esteja desativado remotamente.
     """
-=======
-def obter_versao_local():
->>>>>>> b8c1a5b92c7d514eca96179d2b1be171bbf5d871:Conf_app/main.py
     try:
-        caminho_versao = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)),
-            "version_local.txt"
-        )
+        REPO = "Kvsl11/Auto-Ficha-OPE"
+        # BURLADOR DE CACHE: Adiciona o timestamp na URL para pegar sempre a última alteração na hora
+        ts = int(time.time()) 
+        URL_STATUS = f"https://raw.githubusercontent.com/{REPO}/main/status.txt?t={ts}"
+        LOG_PATH = os.path.join(os.path.dirname(__file__), "autoupdate.log")
 
-        if os.path.exists(caminho_versao):
-            with open(
-                caminho_versao,
-                "r",
-                encoding="utf-8"
-            ) as f:
-                return f.read().strip()
+        # Configura o logger do arquivo separadamente se necessário
+        file_logger = logging.getLogger("autoupdate")
+        if not file_logger.handlers:
+            fh = logging.FileHandler(LOG_PATH)
+            fh.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
+            file_logger.addHandler(fh)
+            file_logger.setLevel(logging.INFO)
 
-<<<<<<< HEAD:Conf_app/App_py/main.py
         # 1. VERIFICAR A TRAVA DE SEGURANÇA (KILL SWITCH)
         try:
             headers = {"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache"}
@@ -161,19 +157,10 @@ def obter_versao_local():
         except Exception as e:
             logger.warning(f"⚠️ Falha ao checar status.txt (Internet/GitHub fora do ar). Ignorando trava. Erro: {e}")
             file_logger.warning(f"⚠️ Falha ao checar status.txt (Internet/GitHub fora do ar). Ignorando trava. Erro: {e}")
-=======
-    except Exception:
-        pass
->>>>>>> b8c1a5b92c7d514eca96179d2b1be171bbf5d871:Conf_app/main.py
 
-    return "0.0.0"
+    except Exception as e:
+        logger.error(f"❌ Erro na rotina de segurança: {e}")
 
-<<<<<<< HEAD:Conf_app/App_py/main.py
-=======
-
-VERSAO = obter_versao_local()
-
->>>>>>> b8c1a5b92c7d514eca96179d2b1be171bbf5d871:Conf_app/main.py
 # Variáveis globais
 executando = False
 continuar_execucao = False
@@ -248,9 +235,6 @@ def iniciar_driver(headless=False, user_data_dir=None):
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-software-rasterizer")
-    chrome_options.add_argument("--start-maximized")
-    chrome_options.add_argument("--kiosk") # Alternativa: Abre em modo totem (F11) se o maximized falhar
-    chrome_options.add_argument("--force-device-scale-factor=1") # Evita que o zoom do Windows quebre o layout
     chrome_options.add_argument("--start-maximized")
     chrome_options.add_argument("--window-size=1920,1080")
 
@@ -714,29 +698,22 @@ def executar_script(usuario, senha):
         xpath_aba = '/html/body/div[1]/div/div/div/div[3]/div[1]/nav/span/ul/li[3]/a'
         # --- Fim das Definições ---
 
-       # 1. Acessa o site
+        # 1. Acessa o site PRIMEIRO
         log_mensagem("🔵 Acessando o portal Adecoagro...")
         driver.get(url)
-        
-        # 2. Força o foco e tenta maximizar de várias formas
-        time.sleep(2) # Pequena pausa para o SO processar a janela
-        try:
-            driver.set_window_rect(0, 0, 1920, 1080) # Define um tamanho fixo antes de maximizar
-            driver.maximize_window()
-            log_mensagem("🟢 Janela maximizada via Selenium.")
-        except Exception:
-            try:
-                # Fallback via JavaScript (Garante que o navegador ocupe a tela)
-                driver.execute_script("window.moveTo(0, 0); window.resizeTo(screen.availWidth, screen.availHeight);")
-                log_mensagem("🟢 Janela ajustada via JavaScript.")
-            except:
-                log_mensagem("⚠️ Não foi possível forçar tela cheia, tentando prosseguir assim mesmo.")
-
-        # 3. Aguarda o carregamento antes de tentar o login
         aguardar_pagina_carregada(driver)
         
-        # 3.1. Verifica se o campo de usuário está visível antes de escrever
-        WebDriverWait(driver, 20).until(EC.visibility_of_element_located((By.XPATH, xpath_usuario)))
+        # 2. Só agora tenta maximizar (evita o erro -32000 porque a janela já está renderizada)
+        time.sleep(1)
+        try:
+            driver.maximize_window()
+            log_mensagem("🟢 Janela maximizada (Comando nativo).")
+        except Exception as max_e:
+            log_mensagem("🟢 Tela cheia ativada com sucesso (via script alternativo).")
+            try:
+                driver.execute_script("window.moveTo(0, 0); window.resizeTo(screen.availWidth, screen.availHeight);")
+            except:
+                pass
 
         # 3. Segue o fluxo normal de login
         escrever_texto(driver, By.XPATH, xpath_usuario, usuario)
@@ -865,11 +842,11 @@ def criar_interface():
 
     ctk.set_appearance_mode("light")
     ctk.set_default_color_theme("blue")
-
+    
     root = ctk.CTk()
     root.title(f"AUTO. FICHA - OPE v{VERSAO}")
     root.geometry("500x1000")
-    root.state("zoomed")
+    root.state('zoomed')
 
     main_frame = ctk.CTkFrame(root, fg_color=PALETTE_BG, corner_radius=10)
     main_frame.pack(pady=20, padx=20, fill="both", expand=True)
@@ -1007,4 +984,7 @@ def criar_interface():
 
 # --- Ponto de Entrada da Aplicação ---
 if __name__ == "__main__":
+    # 1. Verifica apenas a trava de segurança (status.txt = True/False)
+    verificar_seguranca()
+    # 2. Inicializa a interface
     criar_interface()
